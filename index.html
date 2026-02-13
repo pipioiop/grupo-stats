@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script lang="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2e353d">
+  <title>Futsal GNA - Fafe</title>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW Registered', reg))
+          .catch(err => console.log('SW Failed', err));
+      });
+    }
+  </script>
+</head>
+
+<body>
+  <div id="app-container">
+    <div id="grid-container">
+      <div class="panel header" id="header">
+        <div class="header-content"
+          style="width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2vh; padding: 0.2vh 0;">
+          <img src="logo.png" alt="Logo" style="height: 6vh; width: auto; max-width: 100%; object-fit: contain;">
+          <div id="header-team-name" contenteditable="true" spellcheck="false"
+            style="font-size: 2.8vh; font-weight: bold; color: var(--grey7);">GRUPO NUN´ÁLVARES - FAFE</div>
+          <div id="match-details" contenteditable="true" spellcheck="false"
+            style="font-size: 1.8vh; color: var(--yellow1); font-weight: bold; margin-top: 0.5vh;"></div>
+        </div>
+        <div style="display: flex; flex-direction: row; width: 100%;">
+          <label class="load-file" id="lbl-head-team" style="height: 3vh;">
+            <input type="file" class="head-input" id="head-team">
+            Carregar Equipa
+          </label>
+          <label class="load-file" id="lbl-head-match" style="height: 3vh;">
+            <input type="file" class="head-input" id="head-match">
+            Carregar Jogo
+          </label>
+          <button class="button-1 head" id="head-save" style="height: 3vh;">Guardar Jogo</button>
+          <button class="button-1 head" id="head-export" style="height: 3vh;">Exportar Dados</button>
+        </div>
+        <div
+          style="display: flex; flex-direction: row; width: 100%; margin-top: 0.5vh; gap: 0.5vw; align-items: center; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px;">
+          <span style="font-size: 1.2vh; color: var(--grey5); font-weight: bold;">PREDEFINIÇÕES:</span>
+          <input type="text" id="preset-name" placeholder="Nome da Equipa..."
+            style="height: 2.5vh; font-size: 1.2vh; border-radius: 3px; border: 1px solid #444; background: #222; color: #fff; padding: 0 5px; width: 10vw;">
+          <button class="button-1 head" id="btn-save-preset"
+            style="height: 2.5vh; font-size: 1.2vh; background-image: linear-gradient(180deg, #2ecc71, #27ae60); padding: 0 10px;">Salvar</button>
+          <div style="width: 1px; height: 2vh; background: #444; margin: 0 5px;"></div>
+          <select id="preset-list"
+            style="height: 2.5vh; font-size: 1.2vh; border-radius: 3px; border: 1px solid #444; background: #222; color: #fff; width: 10vw;"></select>
+          <button class="button-1 head" id="btn-load-preset"
+            style="height: 2.5vh; font-size: 1.2vh; background-image: linear-gradient(180deg, #3498db, #2980b9); padding: 0 10px;">Carregar</button>
+          <button class="button-1 head" id="btn-delete-preset"
+            style="height: 2.5vh; font-size: 1.2vh; background-image: linear-gradient(180deg, #e74c3c, #c0392b); padding: 0 10px;">Apagar</button>
+        </div>
+      </div>
+      <button id="btn-reset"
+        style="position: absolute; top: 0; right: 0; background-color: darkred; color: white; border: none; padding: 5px; font-size: 10px; z-index: 9999;">RESET
+        APP v7.0</button>
+      <script>
+        document.getElementById("btn-reset").onclick = function () {
+          if (confirm("Isto vai apagar a cache e reiniciar a aplicação. Confirmar?")) {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) { registration.unregister(); }
+              });
+            }
+            if ('caches' in window) {
+              caches.keys().then(function (names) {
+                for (let name of names) caches.delete(name);
+              });
+            }
+            setTimeout(() => { window.location.reload(true); }, 500);
+          }
+        }
+      </script>
+      <div class="panel" id="pnl-time">
+        <label class="txt-lbl" for="period" id="lbl-period">PERÍODO:</label>
+        <p class="txt-1 period break" id="period">0</p>
+        <button class="button-1 pause" id="pause">PAUSA</button>
+        <button class="button-1 break" id="break">INTERVALO</button>
+        <button class="button-1 endreg" id="end-reg">FIM TEMPO REGULAMENTAR</button>
+        <button class="button-1 kickoff" id="kick-off">PONTAPÉ DE SAÍDA</button>
+        <label class="txt-lbl" for="clock-main" id="lbl-clock-main">TEMPO:</label>
+        <p class="clock break" id="clock-main">00:00</p>
+      </div>
+      <div class="panel" id="pnl-stop">
+        <button class="button-1 stop" id="stoppage">PARAGEM</button>
+        <label class="txt-lbl" for="clock-play" id="lbl-clock-play">TEMPO DE JOGO:</label>
+        <p class="clock break" id="clock-play">20:00</p>
+        <button class="button-1 livres" id="btn-livres"
+          style="background-image: linear-gradient(180deg, #1abc9c, #16a085);">SUBSTITUÍR ⚽</button>
+        <button class="button-1 replace-expelled" id="btn-replace-expelled"
+          style="background-image: linear-gradient(180deg, #3498db, #2980b9); margin-top: 0.5vh;">REPOR 5º
+          JOGADOR</button>
+        <button class="button-1 cards" id="btn-cards-global"
+          style="background-image: linear-gradient(180deg, #f39212, #d35400); margin-top: 0.5vh;">CARTÕES</button>
+      </div>
+      <!-- Metrics panel removed per user request
+      <div class="panel" id="pnl-metrics">
+        <div class="metric" id="met-one">
+          <div class="met-lbl" id="m1-lbl" contenteditable="true">Remates</div>
+          <div class="met-team" id="m1-h">CASA</div>
+          <div class="met-team" id="m1-a">FORA</div>
+          <button class="met-btn pos" id="m1-pos-h">+</button>
+          <button class="met-btn neg" id="m1-neg-h">-</button>
+          <button class="met-btn pos" id="m1-pos-a">+</button>
+          <button class="met-btn neg" id="m1-neg-a">-</button>
+          <div class="met-val" id="m1-val-h">0</div>
+          <div class="met-val" id="m1-val-a">0</div>
+        </div>
+        <div class="metric" id="met-two">
+          <div class="met-lbl" id="m2-lbl" contenteditable="true">Passes Incompletos</div>
+          <div class="met-team" id="m2-h">CASA</div>
+          <div class="met-team" id="m2-a">FORA</div>
+          <button class="met-btn pos" id="m2-pos-h">+</button>
+          <button class="met-btn neg" id="m2-neg-h">-</button>
+          <button class="met-btn pos" id="m2-pos-a">+</button>
+          <button class="met-btn neg" id="m2-neg-a">-</button>
+          <div class="met-val" id="m2-val-h">0</div>
+          <div class="met-val" id="m2-val-a">0</div>
+        </div>
+        <div class="metric" id="met-three">
+          <div class="met-lbl" id="m3-lbl" contenteditable="true">Perdas de Bola</div>
+          <div class="met-team" id="m3-h">CASA</div>
+          <div class="met-team" id="m3-a">FORA</div>
+          <button class="met-btn pos" id="m3-pos-h">+</button>
+          <button class="met-btn neg" id="m3-neg-h">-</button>
+          <button class="met-btn pos" id="m3-pos-a">+</button>
+          <button class="met-btn neg" id="m3-neg-a">-</button>
+          <div class="met-val" id="m3-val-h">0</div>
+          <div class="met-val" id="m3-val-a">0</div>
+        </div>
+      </div>
+      -->
+      <div class="panel" id="pnl-match">
+        <p class="txt-1" id="home">EQUIPA CASA</p>
+        <p class="txt-1" id="away">EQUIPA FORA</p>
+        <button class="met-btn pos" id="goal-h-pos">+</button>
+        <button class="met-btn neg" id="goal-h-neg">-</button>
+        <button class="met-btn pos" id="goal-a-pos">+</button>
+        <button class="met-btn neg" id="goal-a-neg">-</button>
+        <p class="txt-1" id="score-h">0</p>
+        <p class="txt-1" id="score-a">0</p>
+      </div>
+      <div class="panel" id="pnl-field">
+        <div class="player active" id="play1">
+          <button class="jersey topl" id="btn1"></button>
+          <p class="jersey-no" id="no1" contenteditable="true" spellcheck="false">1.</p>
+          <p class="jersey-pos" id="pos1" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name1" contenteditable="true" spellcheck="false">Jogador</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind1"></div>
+            <div class="card-ind rind" id="rind1"></div>
+          </div>
+          <p class="jersey-rot" id="rot1">0</p>
+          <p class="jersey-time" id="time1">00:00</p>
+          <p class="jersey-wr" id="wr1">1.00</p>
+          <p class="jersey-tp" id="tp1">00:00</p>
+          <p class="jersey-tr" id="tr1">00:00</p>
+          <div class="jersey-star" id="star1"></div>
+        </div>
+        <div class="player active" id="play2">
+          <button class="jersey topr" id="btn2"></button>
+          <p class="jersey-no" id="no2" contenteditable="true" spellcheck="false">2.</p>
+          <p class="jersey-pos" id="pos2" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name2" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind2"></div>
+            <div class="card-ind rind" id="rind2"></div>
+          </div>
+          <p class="jersey-rot" id="rot2">0</p>
+          <p class="jersey-time" id="time2">00:00</p>
+          <p class="jersey-wr" id="wr2">1.00</p>
+          <p class="jersey-tp" id="tp2">00:00</p>
+          <p class="jersey-tr" id="tr2">00:00</p>
+          <div class="jersey-star" id="star2"></div>
+        </div>
+        <div class="player active" id="play3">
+          <button class="jersey midl" id="btn3"></button>
+          <p class="jersey-no" id="no3" contenteditable="true" spellcheck="false">3.</p>
+          <p class="jersey-pos" id="pos3" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name3" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind3"></div>
+            <div class="card-ind rind" id="rind3"></div>
+          </div>
+          <p class="jersey-rot" id="rot3">0</p>
+          <p class="jersey-time" id="time3">00:00</p>
+          <p class="jersey-wr" id="wr3">1.00</p>
+          <p class="jersey-tp" id="tp3">00:00</p>
+          <p class="jersey-tr" id="tr3">00:00</p>
+          <div class="jersey-star" id="star3"></div>
+        </div>
+        <div class="player active" id="play4">
+          <button class="jersey midr" id="btn4"></button>
+          <p class="jersey-no" id="no4" contenteditable="true" spellcheck="false">4.</p>
+          <p class="jersey-pos" id="pos4" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name4" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind4"></div>
+            <div class="card-ind rind" id="rind4"></div>
+          </div>
+          <p class="jersey-rot" id="rot4">0</p>
+          <p class="jersey-time" id="time4">00:00</p>
+          <p class="jersey-wr" id="wr4">1.00</p>
+          <p class="jersey-tp" id="tp4">00:00</p>
+          <p class="jersey-tr" id="tr4">00:00</p>
+          <div class="jersey-star" id="star4"></div>
+        </div>
+        <div class="player active" id="play5">
+          <button class="jersey btml" id="btn5"></button>
+          <p class="jersey-no" id="no5" contenteditable="true" spellcheck="false">5.</p>
+          <p class="jersey-pos" id="pos5" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name5" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind5"></div>
+            <div class="card-ind rind" id="rind5"></div>
+          </div>
+          <p class="jersey-rot" id="rot5">0</p>
+          <p class="jersey-time" id="time5">00:00</p>
+          <p class="jersey-wr" id="wr5">1.00</p>
+          <p class="jersey-tp" id="tp5">00:00</p>
+          <p class="jersey-tr" id="tr5">00:00</p>
+          <div class="jersey-star" id="star5"></div>
+        </div>
+        <div class="player" id="play6">
+          <button class="jersey btmr" id="btn6"></button>
+          <p class="jersey-no" id="no6" contenteditable="true" spellcheck="false">6.</p>
+          <p class="jersey-pos" id="pos6" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name6" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind6"></div>
+            <div class="card-ind rind" id="rind6"></div>
+          </div>
+          <p class="jersey-rot" id="rot6">0</p>
+          <p class="jersey-time" id="time6">00:00</p>
+          <p class="jersey-wr" id="wr6">1.00</p>
+          <p class="jersey-tp" id="tp6">00:00</p>
+          <p class="jersey-tr" id="tr6">00:00</p>
+          <div class="jersey-star" id="star6"></div>
+        </div>
+        <div class="player" id="play7">
+          <button class="jersey btmc" id="btn7"></button>
+          <p class="jersey-no" id="no7" contenteditable="true" spellcheck="false">7.</p>
+          <p class="jersey-pos" id="pos7" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name7" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind7"></div>
+            <div class="card-ind rind" id="rind7"></div>
+          </div>
+          <p class="jersey-rot" id="rot7">0</p>
+          <p class="jersey-time" id="time7">00:00</p>
+          <p class="jersey-wr" id="wr7">1.00</p>
+          <p class="jersey-tp" id="tp7">00:00</p>
+          <p class="jersey-tr" id="tr7">00:00</p>
+          <div class="jersey-star" id="star7"></div>
+        </div>
+        <div class="player" id="play8">
+          <button class="jersey topl" id="btn8"></button>
+          <p class="jersey-no" id="no8" contenteditable="true" spellcheck="false">8.</p>
+          <p class="jersey-pos" id="pos8" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name8" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind8"></div>
+            <div class="card-ind rind" id="rind8"></div>
+          </div>
+          <p class="jersey-rot" id="rot8">0</p>
+          <p class="jersey-time" id="time8">00:00</p>
+          <p class="jersey-wr" id="wr8">1.00</p>
+          <p class="jersey-tp" id="tp8">00:00</p>
+          <p class="jersey-tr" id="tr8">00:00</p>
+          <div class="jersey-star" id="star8"></div>
+        </div>
+        <div class="player" id="play9">
+          <button class="jersey topr" id="btn9"></button>
+          <p class="jersey-no" id="no9" contenteditable="true" spellcheck="false">9.</p>
+          <p class="jersey-pos" id="pos9" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name9" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind9"></div>
+            <div class="card-ind rind" id="rind9"></div>
+          </div>
+          <p class="jersey-rot" id="rot9">0</p>
+          <p class="jersey-time" id="time9">00:00</p>
+          <p class="jersey-wr" id="wr9">1.00</p>
+          <p class="jersey-tp" id="tp9">00:00</p>
+          <p class="jersey-tr" id="tr9">00:00</p>
+          <div class="jersey-star" id="star9"></div>
+        </div>
+        <div class="player" id="play10">
+          <button class="jersey midl" id="btn10"></button>
+          <p class="jersey-no" id="no10" contenteditable="true" spellcheck="false">10.</p>
+          <p class="jersey-pos" id="pos10" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name10" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind10"></div>
+            <div class="card-ind rind" id="rind10"></div>
+          </div>
+          <p class="jersey-rot" id="rot10">0</p>
+          <p class="jersey-time" id="time10">00:00</p>
+          <p class="jersey-wr" id="wr10">1.00</p>
+          <p class="jersey-tp" id="tp10">00:00</p>
+          <p class="jersey-tr" id="tr10">00:00</p>
+          <div class="jersey-star" id="star10"></div>
+        </div>
+        <div class="player" id="play11">
+          <button class="jersey midr" id="btn11"></button>
+          <p class="jersey-no" id="no11" contenteditable="true" spellcheck="false">11.</p>
+          <p class="jersey-pos" id="pos11" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name11" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind11"></div>
+            <div class="card-ind rind" id="rind11"></div>
+          </div>
+          <p class="jersey-rot" id="rot11">0</p>
+          <p class="jersey-time" id="time11">00:00</p>
+          <p class="jersey-wr" id="wr11">1.00</p>
+          <p class="jersey-tp" id="tp11">00:00</p>
+          <p class="jersey-tr" id="tr11">00:00</p>
+          <div class="jersey-star" id="star11"></div>
+        </div>
+        <div class="player" id="play12">
+          <button class="jersey btml" id="btn12"></button>
+          <p class="jersey-no" id="no12" contenteditable="true" spellcheck="false">12.</p>
+          <p class="jersey-pos" id="pos12" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name12" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind12"></div>
+            <div class="card-ind rind" id="rind12"></div>
+          </div>
+          <p class="jersey-rot" id="rot12">0</p>
+          <p class="jersey-time" id="time12">00:00</p>
+          <p class="jersey-wr" id="wr12">1.00</p>
+          <p class="jersey-tp" id="tp12">00:00</p>
+          <p class="jersey-tr" id="tr12">00:00</p>
+          <div class="jersey-star" id="star12"></div>
+        </div>
+        <div class="player" id="play13">
+          <button class="jersey btmr" id="btn13"></button>
+          <p class="jersey-no" id="no13" contenteditable="true" spellcheck="false">13.</p>
+          <p class="jersey-pos" id="pos13" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name13" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind13"></div>
+            <div class="card-ind rind" id="rind13"></div>
+          </div>
+          <p class="jersey-rot" id="rot13">0</p>
+          <p class="jersey-time" id="time13">00:00</p>
+          <p class="jersey-wr" id="wr13">1.00</p>
+          <p class="jersey-tp" id="tp13">00:00</p>
+          <p class="jersey-tr" id="tr13">00:00</p>
+          <div class="jersey-star" id="star13"></div>
+        </div>
+        <div class="player" id="play14">
+          <button class="jersey btmc" id="btn14"></button>
+          <p class="jersey-no" id="no14" contenteditable="true" spellcheck="false">14.</p>
+          <p class="jersey-pos" id="pos14" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name14" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind14"></div>
+            <div class="card-ind rind" id="rind14"></div>
+          </div>
+          <p class="jersey-rot" id="rot14">0</p>
+          <p class="jersey-time" id="time14">00:00</p>
+          <p class="jersey-wr" id="wr14">1.00</p>
+          <p class="jersey-tp" id="tp14">00:00</p>
+          <p class="jersey-tr" id="tr14">00:00</p>
+          <div class="jersey-star" id="star14"></div>
+        </div>
+        <div class="player" id="play15">
+          <button class="jersey topl" id="btn15"></button>
+          <p class="jersey-no" id="no15" contenteditable="true" spellcheck="false">15.</p>
+          <p class="jersey-pos" id="pos15" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name15" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind15"></div>
+            <div class="card-ind rind" id="rind15"></div>
+          </div>
+          <p class="jersey-rot" id="rot15">0</p>
+          <p class="jersey-time" id="time15">00:00</p>
+          <p class="jersey-wr" id="wr15">1.00</p>
+          <p class="jersey-tp" id="tp15">00:00</p>
+          <p class="jersey-tr" id="tr15">00:00</p>
+          <div class="jersey-star" id="star15"></div>
+        </div>
+        <div class="player" id="play16">
+          <button class="jersey topr" id="btn16"></button>
+          <p class="jersey-no" id="no16" contenteditable="true" spellcheck="false">16.</p>
+          <p class="jersey-pos" id="pos16" contenteditable="true" spellcheck="false"></p>
+          <p class="jersey-name" id="name16" contenteditable="true" spellcheck="false">Player</p>
+          <div class="card-indicators">
+            <div class="card-ind yind" id="yind16"></div>
+            <div class="card-ind rind" id="rind16"></div>
+          </div>
+          <p class="jersey-rot" id="rot16">0</p>
+          <p class="jersey-time" id="time16">00:00</p>
+          <p class="jersey-wr" id="wr16">1.00</p>
+          <p class="jersey-tp" id="tp16">00:00</p>
+          <p class="jersey-tr" id="tr16">00:00</p>
+          <div class="jersey-star" id="star16"></div>
+        </div>
+      </div>
+      <div class="panel" id="pnl-analysis" style="height:fit-content; overflow-y:auto;">
+        <table class="tbl-data" id="tbl-anl">
+          <tr>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Cartões -->
+  <div id="modal-cards" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Aplicar Cartão</h3>
+      <p id="modal-player-name">Jogador</p>
+      <div class="modal-buttons">
+        <button id="modal-btn-yellow" class="modal-opt yellow">AMARELO</button>
+        <button id="modal-btn-red" class="modal-opt red">VERMELHO</button>
+        <button id="modal-btn-cancel" class="modal-opt cancel">CANCELAR</button>
+      </div>
+    </div>
+  </div>
+  <!-- Audio Alert -->
+  <audio id="audio-alert" src="alert.mp3" preload="auto"></audio>
+</body>
+<script src="game.js?v=14"></script>
+
+</html>

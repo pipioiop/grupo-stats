@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Export</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+</head>
+
+<body>
+    <h1>Test Export Functionality</h1>
+    <button onclick="testExport()">Test Export</button>
+    <div id="status"></div>
+
+    <script>
+        function s2ab(s) {
+            var buf = new ArrayBuffer(s.length);
+            var view = new Uint8Array(buf);
+            for (var i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+            return buf;
+        }
+
+        function testExport() {
+            var status = document.getElementById('status');
+            try {
+                status.innerHTML = 'Starting export...<br>';
+
+                // Check if XLSX is loaded
+                if (typeof XLSX === 'undefined') {
+                    status.innerHTML += 'ERROR: XLSX library not loaded!<br>';
+                    return;
+                }
+                status.innerHTML += 'XLSX library loaded ✓<br>';
+
+                // Check if saveAs is loaded
+                if (typeof saveAs === 'undefined') {
+                    status.innerHTML += 'ERROR: FileSaver (saveAs) not loaded!<br>';
+                    return;
+                }
+                status.innerHTML += 'FileSaver library loaded ✓<br>';
+
+                // Create a simple workbook
+                var wb = XLSX.utils.book_new();
+                wb.Props = {
+                    Title: "Test Export",
+                    Author: "Test",
+                    CreatedDate: new Date()
+                };
+
+                // Create test data
+                var testData = [
+                    ["Name", "Age", "City"],
+                    ["João", 25, "Porto"],
+                    ["Maria", 30, "Lisboa"]
+                ];
+
+                var ws = XLSX.utils.aoa_to_sheet(testData);
+                wb.SheetNames.push("Test Sheet");
+                wb.Sheets["Test Sheet"] = ws;
+
+                status.innerHTML += 'Workbook created ✓<br>';
+
+                // Export
+                var fileName = "test_export.xlsx";
+                var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                status.innerHTML += 'Workbook written ✓<br>';
+
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), fileName);
+                status.innerHTML += 'Export successful! ✓<br>';
+                status.innerHTML += 'File should download as: ' + fileName;
+
+            } catch (error) {
+                status.innerHTML += 'ERROR: ' + error.message + '<br>';
+                console.error('Export error:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>

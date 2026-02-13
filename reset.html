@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Limpeza Futsal App</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #222;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 90vh;
+        }
+
+        h1 {
+            color: #f39212;
+        }
+
+        button {
+            padding: 20px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            background: #d35400;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            margin-top: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #a04000;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>LIMPEZA DE UTÊNSILIOS</h1>
+    <p>O seu tablet está a usar uma versão antiga.</p>
+    <p>Clique no botão abaixo para <b>APAGAR TUDO</b> e receber a nova versão.</p>
+
+    <button onclick="superReset()">LIMPAR E ATUALIZAR</button>
+
+    <div id="status"></div>
+
+    <script>
+        async function superReset() {
+            const status = document.getElementById("status");
+            status.innerHTML = "A iniciar limpeza...";
+
+            try {
+                // 1. Unregister Service Workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        console.log("Service Worker Unregistered");
+                    }
+                }
+
+                // 2. Delete all caches
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    for (let key of keys) {
+                        await caches.delete(key);
+                        console.log("Cache deleted: " + key);
+                    }
+                }
+
+                status.innerHTML = "Limpeza Concluída! <br> A reiniciar em 3 segundos...";
+
+                // 3. Redirect to index with timestamp to bust network cache
+                setTimeout(() => {
+                    window.location.href = "index.html?t=" + new Date().getTime();
+                }, 3000);
+
+            } catch (e) {
+                status.innerHTML = "Erro: " + e.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
