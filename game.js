@@ -1675,6 +1675,43 @@ btnExport.onclick = function () {
     wb = pushSheet(wb, "Metrics", dataMetrics);
     wb = pushSheet(wb, "Playing Stats", dataPlayEvents);
 
+    // Time Graph Tab (Visual Representation)
+    var dataTimeGraph = [];
+    dataTimeGraph.push(["Nº", "Jogador", "Tempo Total", "Gráfico Visual (██)"]);
+
+    // 1. Calculate totals first to find the max (for scaling the graph)
+    var playerTotals = [];
+    var maxSeconds = 0;
+    for (var i = 0; i < struct_team.players.length; i++) {
+        var totalSec = 0;
+        for (var p = 0; p < struct_general.nper; p++) {
+            totalSec += tbl_period["Tempo de Jogo"][p][i];
+        }
+        playerTotals.push({
+            pno: struct_team.players[i].pno,
+            name: struct_team.players[i].nlast,
+            seconds: totalSec
+        });
+        if (totalSec > maxSeconds) maxSeconds = totalSec;
+    }
+
+    // 2. Generate rows with a visual indicator
+    for (var i = 0; i < playerTotals.length; i++) {
+        var p = playerTotals[i];
+        var barLength = maxSeconds > 0 ? Math.round((p.seconds / maxSeconds) * 20) : 0;
+        var bar = "";
+        for (var b = 0; b < barLength; b++) bar += "█";
+        for (var b = barLength; b < 20; b++) bar += "░";
+
+        dataTimeGraph.push([
+            p.pno,
+            p.name,
+            setClock(p.seconds),
+            bar
+        ]);
+    }
+    wb = pushSheet(wb, "Gráfico de Tempo", dataTimeGraph);
+
     // Export
     var dateStr = struct_match["date"].join("-"); // Convert array to YYYY-MM-DD
     var fileName = struct_match["teams"][0] + "_" + struct_match["teams"][1] + "_" + dateStr + ".xlsx";
@@ -2109,6 +2146,44 @@ function deletePreset(name) {
     initPresetsUI();
 }
 
+// Flag for player editing mode
+let isEditingPlayers = false;
+
+function togglePlayerEditing() {
+    isEditingPlayers = !isEditingPlayers;
+    const btn = document.getElementById('btn-edit-toggle');
+    const editable = isEditingPlayers;
+
+    // Update button text and style
+    if (isEditingPlayers) {
+        btn.innerText = "BLOQUEAR";
+        btn.style.backgroundImage = "linear-gradient(180deg, #e74c3c, #c0392b)"; // Red to match "Bloquear"
+    } else {
+        btn.innerText = "EDITAR EQUIPA";
+        btn.style.backgroundImage = "linear-gradient(180deg, #f39c12, #d35400)"; // Original orange
+    }
+
+    // Toggle contenteditable for all player fields
+    for (let i = 1; i <= 16; i++) {
+        const fields = ['no', 'pos', 'name'];
+        fields.forEach(f => {
+            const el = document.getElementById(f + i);
+            if (el) {
+                el.contentEditable = editable;
+                if (editable) {
+                    el.classList.add('editing-active');
+                } else {
+                    el.classList.remove('editing-active');
+                }
+            }
+        });
+    }
+
+    if (!editable) {
+        alert("Edição bloqueada. Alterações guardadas no estado da aplicação.");
+    }
+}
+
 function initEditableListeners() {
     for (let i = 0; i < struct_team.players.length; i++) {
         const pIdx = i + 1;
@@ -2143,6 +2218,13 @@ function initEditableListeners() {
             });
             elName.addEventListener('click', (e) => e.stopPropagation());
         }
+    }
+
+    // Global edit toggle listener
+    const btnToggle = document.getElementById('btn-edit-toggle');
+    if (btnToggle && !btnToggle.onclickSet) {
+        btnToggle.onclick = togglePlayerEditing;
+        btnToggle.onclickSet = true;
     }
 }
 
